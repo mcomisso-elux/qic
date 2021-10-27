@@ -33,6 +33,7 @@ def snmpWalk(host, community, oid, progressSteps):
                 i = i + step
                 progress_bar.UpdateBar(i)
                 results.append(varBind)
+    progress_bar.UpdateBar(0)
     return results
 
 def snmpGet(host, community, oid):
@@ -83,7 +84,6 @@ layout = [
     [sg.Text('Frequency (sec):'), sg.InputText('2', size = (5, 1)), sg.Text('History (steps):'), sg.InputText('50', size = (5, 1)), sg.Text('Unit:'), sg.Spin(['Kilo','Mega','Giga'], initial_value = 'Kilo'), sg.Button('Update'), sg.Text(key = "-LOADING-"), sg.Text(key = "-MISS-")],
     [sg.Canvas(key = "-CANVAS 1-"), sg.Canvas(key = "-CANVAS 2-")]
 ]
-
 
 window = sg.Window('QIC - Quick Interface Checker (Alpha)', layout, finalize = True, resizable = True, location = (0, 0))
 progress_bar = window['-PROGRESSBAR-']
@@ -151,7 +151,7 @@ while True:
                 
                 # Create the list to display
                 listList = []
-                for i in range(0, int(interfaceCount)):
+                for i in range(0, len(interfaces)):
                     intOid = str(interfaces[i][0]).split('.')[-1]
                     intName = str(interfaces[i][1])
                     if values[2] == True:
