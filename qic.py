@@ -75,13 +75,18 @@ def getMePoints(data):
             else:
                 break
 
+menu_def = [
+    ['&Help', '&About QIC']
+]
+
 # Window layout
 
 layout = [
+    [sg.Menu(menu_def)],
     [sg.Text('Target IP address:'), sg.InputText('', size = (20, 1)), sg.Text('SNMP community:'), sg.InputText('', size = (20, 1)), sg.Checkbox('Get status'), sg.Checkbox('Get description'), sg.Button('Scan'), sg.Text('Hostname: '), sg.Text(key = "-HOSTNAME-"), sg.Text(text_color = "red", key = "-ACTION-")],
     [sg.ProgressBar(progressBarLimit, orientation = 'h', size = (101, 20), key = '-PROGRESSBAR-')],
     [sg.Listbox(font = ("Courier New", 9), values = [], enable_events = True, size = (185, 10), key = "-INTERFACE LIST-")],
-    [sg.Text('Frequency (sec):'), sg.InputText('2', size = (5, 1)), sg.Text('History (steps):'), sg.InputText('50', size = (5, 1)), sg.Text('Unit:'), sg.Spin(['Kilo','Mega','Giga'], initial_value = 'Kilo'), sg.Button('Update'), sg.Text(key = "-LOADING-"), sg.Text(key = "-MISS-")],
+    [sg.Text('Frequency (sec):'), sg.InputText('2', size = (5, 1)), sg.Text('History (steps):'), sg.InputText('50', size = (5, 1)), sg.Text('Unit:'), sg.Spin(['Kilo','Mega','Giga'], initial_value = 'Kilo'), sg.Checkbox('Sync graphs', default = True), sg.Button('Update'), sg.Text(key = "-LOADING-"), sg.Text(key = "-MISS-")],
     [sg.Canvas(key = "-CANVAS 1-"), sg.Canvas(key = "-CANVAS 2-")]
 ]
 
@@ -120,18 +125,21 @@ while True:
     
     if event == sg.WIN_CLOSED: # If the user closes the window
         break
+
+    elif event == 'About QIC':      
+        sg.popup_no_buttons('Version 1.2', 'Developed by Matteo Comisso','https://github.com/mcomisso-elux/qic', title = 'About QIC')
     
     elif event == "Scan": # If a scan is initiated
         
         # Check if the fields are ok.
-        if values[0] == '':
+        if values[1] == '':
             sg.popup('Missing target!')
         else:
-            host = values[0]
-        if values[1] == '':
+            host = values[1]
+        if values[2] == '':
             sg.popup('Missing community!')
         else:
-            community = values[1]
+            community = values[2]
         
         # If everything is ok, then get data
         if host != '' and community != '':
@@ -141,10 +149,10 @@ while True:
                 interfaceCount = int(str(snmpGet(host,community,'1.3.6.1.2.1.2.1.0')[0]).split(' ')[-1]) # Get the number of interfaces
                 window["-ACTION-"].update("Loading interface list...")
                 interfaces = snmpWalk(host,community,'1.3.6.1.2.1.2.2.1.2',interfaceCount) # Get the interfaces names
-                if values[2] == True:
+                if values[3] == True:
                     window["-ACTION-"].update("Loading interface status...")
                     status = snmpWalk(host,community,'1.3.6.1.2.1.2.2.1.8',interfaceCount) # Get the interfaces statuses
-                if values[3] == True:
+                if values[4] == True:
                     window["-ACTION-"].update("Loading interface description...")
                     descriptions = snmpWalk(host,community,'1.3.6.1.2.1.31.1.1.1.18',interfaceCount) # Get the interfaces descriptions
                 window["-ACTION-"].update("")
@@ -154,7 +162,7 @@ while True:
                 for i in range(0, len(interfaces)):
                     intOid = str(interfaces[i][0]).split('.')[-1]
                     intName = str(interfaces[i][1])
-                    if values[2] == True:
+                    if values[3] == True:
                         rawStatus = str(status[i][1])
                         if rawStatus == '1':
                             intStatus = 'UP'
@@ -162,7 +170,7 @@ while True:
                             intStatus = 'DOWN'
                     else:
                         intStatus = ''
-                    if values[3] == True:
+                    if values[4] == True:
                         intDesc = str(descriptions[i][1])
                     else:
                         intDesc = ''
@@ -179,9 +187,10 @@ while True:
     elif event == "-INTERFACE LIST-" or event == "Update": # If an interface is chosen from the listbox or the user changed settings
         ifData = values["-INTERFACE LIST-"]
         ifOid = str(ifData[0]).split(' ')[0]
-        frequency = values[4]
-        steps = values[5]
-        unit = values[6]
+        frequency = values[5]
+        steps = values[6]
+        unit = values[7]
+        sync = values[8]
         dataIn = []
         dataOut = []
         tempIn = []
@@ -251,18 +260,27 @@ while True:
                     window["-LOADING-"].update('Done')
             else:
                 window["-LOADING-"].update('Loading...')
-
+            
+            maxList = [1]
+            if len(dataInPoints) > 0: maxList.append(max(dataInPoints))
+            if len(dataOutPoints) > 0: maxList.append(max(dataOutPoints))
+            maxY = max(maxList)
+            
             ind = np.arange(len(dataInPoints))
             axIn.clear()
             axIn.bar(ind, dataInPoints, color = 'green', width = 1, align = 'edge')
             axIn.set_title("Incoming " + unit + "bytes (Utilization: " + str(int(inUsage)) + "%)")
             axIn.set_xlim(0, int(steps))
+            if sync:
+                axIn.set_ylim(0, maxY+maxY*0.1)
             figIn_agg.draw()
             
             ind = np.arange(len(dataOutPoints))
             axOut.clear()
             axOut.set_title("Outgoing " + unit + "bytes (Utilization: " + str(int(outUsage)) + "%)")
             axOut.set_xlim(0, int(steps))
+            if sync:
+                axOut.set_ylim(0, maxY+maxY*0.1)
             axOut.bar(ind, dataOutPoints, color = 'green', width = 1, align = 'edge')
             
             figOut_agg.draw()
